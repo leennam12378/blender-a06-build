@@ -1,3 +1,4 @@
+
 name: Build Blender Android Full
 
 on:
@@ -5,8 +6,8 @@ on:
   push:
     branches: [main]
     paths:
-      - ".github/workflows/build.yml
-      #hello
+      - ".github/workflows/build.yml"
+
 permissions:
   contents: read
 
@@ -14,6 +15,9 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 360
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
       - name: Install build tools
@@ -24,13 +28,17 @@ jobs:
             cmake ninja-build patchelf zip unzip \
             git-lfs openjdk-17-jdk python3 curl
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android components
+      - name: Configure Android SDK
         run: |
-          yes | sdkmanager --licenses
-          sdkmanager \
+          mkdir -p "$HOME/android-sdk"
+          ln -sfn "$ANDROID_HOME/cmdline-tools" "$HOME/android-sdk/cmdline-tools"
+          ln -sfn "$ANDROID_HOME/platform-tools" "$HOME/android-sdk/platform-tools"
+          echo "$ANDROID_HOME/cmdline-tools/16.0/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+
+          yes | "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" --licenses || true
+
+          "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" \
             "ndk;30.0.14904198-beta1" \
             "platform-tools" \
             "build-tools;35.0.1" \
@@ -63,6 +71,7 @@ jobs:
           curl -fL \
             https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/v1.4.341.tar.gz \
             -o /tmp/vulkan-headers.tar.gz
+
           mkdir -p /tmp/vulkan-headers
           tar -xzf /tmp/vulkan-headers.tar.gz \
             -C /tmp/vulkan-headers --strip-components=1
@@ -71,7 +80,7 @@ jobs:
           cp -R /tmp/vulkan-headers/include \
             blender_build_android/lib/vulkan_headers/
 
-      - name: Check available disk space
+      - name: Check available resources
         run: |
           df -h
           free -h
@@ -80,7 +89,6 @@ jobs:
         working-directory: blender
         run: |
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-          export ANDROID_HOME="$ANDROID_HOME"
           export ANDROID_HOST_CC=gcc-14
           export ANDROID_HOST_CXX=g++-14
           python3 build_files/android/build.py full
