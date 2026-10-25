@@ -1,0 +1,95 @@
+name: Build Blender Android Full
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential gcc-14 g++-14 \
+            cmake ninja-build patchelf zip unzip \
+            git-lfs openjdk-17-jdk python3 curl
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android components
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager \
+            "ndk;30.0.14904198-beta1" \
+            "platform-tools" \
+            "build-tools;35.0.1" \
+            "platforms;android-35"
+
+      - name: Download Blender source
+        env:
+          GIT_LFS_SKIP_SMUDGE: "1"
+        run: |
+          git clone --depth 1 \
+            --branch android-alpha-4 \
+            https://github.com/simfeo/blender.git blender
+
+          cd blender
+          git lfs install --local
+          git config lfs.url \
+            https://projects.blender.org/blender/blender.git/info/lfs
+          git config --local \
+            credential.https://projects.blender.org.helper \
+            '!f() { echo username=; echo password=; }; f'
+
+          git lfs pull
+
+          git -c submodule.lib/linux_x64.update=checkout \
+            submodule update --init lib/linux_x64
+          git submodule update --init lib/android_arm64
+
+      - name: Prepare Vulkan headers
+        run: |
+          curl -fL \
+            https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/v1.4.341.tar.gz \
+            -o /tmp/vulkan-headers.tar.gz
+          mkdir -p /tmp/vulkan-headers
+          tar -xzf /tmp/vulkan-headers.tar.gz \
+            -C /tmp/vulkan-headers --strip-components=1
+
+          mkdir -p blender_build_android/lib/vulkan_headers
+          cp -R /tmp/vulkan-headers/include \
+            blender_build_android/lib/vulkan_headers/
+
+      - name: Check available disk space
+        run: |
+          df -h
+          free -h
+
+      - name: Build Full APK with Cycles
+        working-directory: blender
+        run: |
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+          export ANDROID_HOME="$ANDROID_HOME"
+          export ANDROID_HOST_CC=gcc-14
+          export ANDROID_HOST_CXX=g++-14
+          python3 build_files/android/build.py full
+
+      - name: Upload APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blender-android-full
+          path: blender_build_android/android_apk_stage_full/blender-full.apk
+          if-no-files-found: error
+          retention-days: 7
