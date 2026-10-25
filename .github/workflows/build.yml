@@ -13,7 +13,17 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04bsjsysbsybsb5sb5svs5bsv4vs5svs6555252vvev
+
+
+
+
+
+
+    caralhoooooooo
+
+
+    VAU SE FUDERRRRRRR AIIIIIII
     timeout-minutes: 360
     env:
       ANDROID_HOME: /usr/local/lib/android/sdk
