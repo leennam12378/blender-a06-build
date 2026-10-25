@@ -5,8 +5,8 @@ on:
   push:
     branches: [main]
     paths:
-      - ".github/workflows/build.yml"
-
+      - ".github/workflows/build.yml
+      #hello
 permissions:
   contents: read
 
